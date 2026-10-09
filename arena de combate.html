@@ -1,0 +1,1276 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>Arena en Combate</title>
+<style>
+  :root { color-scheme: dark; --bg: #06070f; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; min-height: 100%; background: var(--bg); color: #e8e6ff; font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; }
+  button { cursor: pointer; font: inherit; }
+  main { max-width: 980px; margin: 0 auto; padding: 16px; display: flex; flex-direction: column; min-height: 100vh; }
+  header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 16px; }
+  h1 {
+    margin: 0; font-size: 1.75rem; font-weight: 900; letter-spacing: -0.02em;
+    background: linear-gradient(135deg, #67e8f9, #a78bfa 50%, #f472b6);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .sub { margin: 2px 0 0; color: #71717a; letter-spacing: 0.2em; font-size: 0.65rem; text-transform: uppercase; }
+  .badge {
+    border: 1px solid rgba(167,139,250,.45); background: linear-gradient(135deg, rgba(34,211,238,.12), rgba(167,139,250,.15));
+    border-radius: 999px; padding: 7px 14px; font-size: 0.9rem;
+  }
+  .badge b { color: #6ee7b7; }
+  .grid { display: grid; gap: 12px; }
+  @media (min-width: 720px) { .grid { grid-template-columns: 1fr 1fr; } .full { grid-column: 1 / -1; } }
+  .card {
+    border: 1px solid rgba(255,255,255,.1); background: linear-gradient(160deg, rgba(255,255,255,.07), rgba(255,255,255,.03));
+    border-radius: 18px; padding: 16px; box-shadow: 0 8px 32px rgba(0,0,0,.25);
+  }
+  h2 { margin: 0 0 8px; font-size: 0.95rem; color: #67e8f9; }
+  p.hint { color: #a1a1aa; font-size: 0.8rem; margin: 0 0 10px; }
+  input {
+    width: 100%; background: rgba(0,0,0,.45); border: 1px solid rgba(255,255,255,.12);
+    color: inherit; border-radius: 12px; padding: 12px;
+  }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .btn { border: 0; border-radius: 12px; padding: 12px 16px; font-weight: 800; transition: transform .12s; }
+  .btn:hover { transform: translateY(-1px); }
+  .cyan { background: linear-gradient(135deg, #22d3ee, #67e8f9); color: #000; }
+  .orange { background: linear-gradient(135deg, #f97316, #fb923c); color: #000; }
+  .purple { background: linear-gradient(135deg, #8b5cf6, #a78bfa); color: #fff; }
+  .green { background: linear-gradient(135deg, #10b981, #34d399); color: #000; }
+  .ghost { background: transparent; color: #a5f3fc; border: 1px solid rgba(103,232,249,.45); }
+  .levels { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  @media (min-width: 640px) { .levels { grid-template-columns: repeat(6, 1fr); } }
+  .lv {
+    aspect-ratio: 1; border-radius: 14px; border: 1px solid rgba(255,255,255,.1);
+    background: rgba(0,0,0,.25); color: #52525b; font-size: 1.25rem; font-weight: 900;
+  }
+  .lv.on { border-color: rgba(103,232,249,.75); color: #a5f3fc; box-shadow: 0 0 18px rgba(34,211,238,.2); }
+  .hud {
+    display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+    border: 1px solid rgba(255,255,255,.1); background: rgba(0,0,0,.4);
+    border-radius: 16px; padding: 10px 14px;
+  }
+  .bar { flex: 1; min-width: 120px; }
+  .bar .top { display: flex; justify-content: space-between; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: #a1a1aa; }
+  .track { height: 10px; background: rgba(255,255,255,.1); border-radius: 99px; overflow: hidden; margin-top: 3px; }
+  .fill { height: 100%; border-radius: 99px; transition: width .15s; }
+  .good { background: linear-gradient(90deg, #059669, #34d399); }
+  .bad { background: linear-gradient(90deg, #e11d48, #fb7185); }
+  .shield-fill { background: linear-gradient(90deg, #2563eb, #60a5fa); }
+  .stage {
+    position: relative; flex: 1; min-height: 340px; border-radius: 18px; overflow: hidden;
+    border: 1px solid rgba(255,255,255,.12); background: #000;
+  }
+  canvas { width: 100%; height: 100%; min-height: 340px; display: block; touch-action: none; }
+  .over {
+    position: absolute; inset: 0; background: rgba(0,0,0,.82); display: none;
+    flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+    text-align: center; padding: 16px; backdrop-filter: blur(8px);
+  }
+  .over.show { display: flex; }
+  .over.win-anim #overTitle { animation: winPop 0.7s cubic-bezier(.2,1.4,.4,1) both; }
+  .over.win-anim #overMsg { animation: fadeUp 0.6s ease 0.25s both; }
+  .over.win-anim .row { animation: fadeUp 0.5s ease 0.45s both; }
+  @keyframes winPop {
+    0% { transform: scale(0.3) rotate(-8deg); opacity: 0; }
+    60% { transform: scale(1.15) rotate(2deg); }
+    100% { transform: scale(1) rotate(0); opacity: 1; }
+  }
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .confetti { position: absolute; inset: 0; pointer-events: none; overflow: hidden; z-index: 1; }
+  .help { text-align: center; color: #71717a; font-size: 11px; margin: 4px 0 0; }
+  .touch { display: none; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+  @media (max-width: 800px) { .touch { display: grid; } }
+  .touch button {
+    border-radius: 14px; border: 1px solid rgba(103,232,249,.4);
+    background: rgba(34,211,238,.08); color: #a5f3fc; padding: 14px; font-weight: 800;
+  }
+  .wide { grid-column: 1 / 4; }
+  .hidden { display: none !important; }
+  .tip {
+    position: absolute; left: 50%; top: 18px; transform: translateX(-50%);
+    background: rgba(0,0,0,.82); border: 1px solid rgba(103,232,249,.5);
+    color: #e0f2fe; padding: 10px 18px; border-radius: 12px; font-size: 0.9rem;
+    font-weight: 600; pointer-events: none; z-index: 5; max-width: 90%;
+    opacity: 0; transition: opacity .35s; text-align: center;
+  }
+  .tip.show { opacity: 1; }
+  .bind-row {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,.06);
+  }
+  .bind-row:last-child { border-bottom: 0; }
+  .bind-label { color: #c4b5fd; font-size: 0.9rem; }
+  .bind-btn {
+    min-width: 110px; padding: 8px 12px; border-radius: 10px; font-weight: 700;
+    border: 1px solid rgba(103,232,249,.4); background: rgba(0,0,0,.4); color: #a5f3fc;
+  }
+  .bind-btn.listening { border-color: #fbbf24; color: #fbbf24; }
+  .kbd {
+    display: inline-block; padding: 2px 7px; border-radius: 6px; font-size: 0.75rem;
+    background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.15); font-family: monospace;
+  }
+  .auth-error { color: #fb7185; font-size: 0.85rem; margin: 6px 0 0; min-height: 1.2em; }
+  .tabs { display: flex; gap: 6px; margin-bottom: 12px; }
+  .tab {
+    flex: 1; padding: 10px; border-radius: 10px; border: 1px solid rgba(255,255,255,.12);
+    background: transparent; color: #a1a1aa; font-weight: 700;
+  }
+  .tab.active { background: rgba(34,211,238,.15); border-color: rgba(34,211,238,.5); color: #67e8f9; }
+  .shield-badge { font-size: 11px; color: #60a5fa; font-weight: 700; min-width: 70px; text-align: center; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1>Arena en Combate</h1>
+      <p class="sub">API integrada · cuentas · ranking</p>
+    </div>
+    <div class="badge" id="accountBadge">Invitado</div>
+  </header>
+
+  <section id="auth" class="grid">
+    <div class="card full">
+      <div class="tabs">
+        <button type="button" class="tab active" id="tabLogin">Iniciar sesión</button>
+        <button type="button" class="tab" id="tabRegister">Crear cuenta</button>
+      </div>
+      <div id="loginBox">
+        <h2>Iniciar sesión</h2>
+        <p class="hint">Tu progreso se guarda en este navegador bajo tu cuenta.</p>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <input id="loginUser" maxlength="16" placeholder="Usuario" autocomplete="username" />
+          <input id="loginPass" type="password" maxlength="32" placeholder="Contraseña" autocomplete="current-password" />
+          <button class="btn cyan" id="doLogin" type="button">Entrar</button>
+        </div>
+        <p class="auth-error" id="loginErr"></p>
+        <button class="btn ghost" id="playGuest" type="button" style="width:100%;margin-top:10px">Jugar como invitado</button>
+      </div>
+      <div id="registerBox" class="hidden">
+        <h2>Crear cuenta</h2>
+        <p class="hint">Usuario 3–16 caracteres. Contraseña mínimo 4.</p>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <input id="regUser" maxlength="16" placeholder="Usuario nuevo" autocomplete="username" />
+          <input id="regPass" type="password" maxlength="32" placeholder="Contraseña" autocomplete="new-password" />
+          <input id="regPass2" type="password" maxlength="32" placeholder="Repetir contraseña" autocomplete="new-password" />
+          <button class="btn green" id="doRegister" type="button">Crear y entrar</button>
+        </div>
+        <p class="auth-error" id="regErr"></p>
+      </div>
+    </div>
+  </section>
+
+  <section id="menu" class="grid hidden">
+    <div class="card full">
+      <h2>Cuenta</h2>
+      <p class="hint" id="menuAccountHint">Sesión iniciada</p>
+      <p class="hint" id="apiStatus" style="margin-top:4px">API: …</p>
+      <div class="row">
+        <button class="btn ghost" id="logoutBtn" type="button">Cerrar sesión</button>
+        <button class="btn purple" id="refreshBoard" type="button">Actualizar ranking</button>
+      </div>
+    </div>
+    <div class="card full">
+      <h2>Ranking supervivencia</h2>
+      <p class="hint">Top oleadas guardado en este navegador (API del juego).</p>
+      <div id="leaderboardBox" style="font-size:0.9rem;color:#d4d4d8;max-height:180px;overflow:auto"></div>
+    </div>
+    <div class="card">
+      <h2>Niveles</h2>
+      <p class="hint">6 niveles · empieza fácil y sube la dificultad.</p>
+      <div class="levels" id="levels"></div>
+    </div>
+    <div class="card">
+      <h2 style="color:#fdba74">Supervivencia</h2>
+      <p class="hint">Oleadas sin fin.</p>
+      <button class="btn orange" id="survival" type="button" style="width:100%">Entrar</button>
+      <p class="hint" id="best" style="margin-top:10px"></p>
+    </div>
+    <div class="card full" style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn purple" id="toControls" type="button" style="flex:1">Controles</button>
+      <button class="btn ghost" id="toTutorial" type="button" style="flex:1">Cómo jugar</button>
+    </div>
+  </section>
+
+  <section id="controls" class="hidden">
+    <div class="card">
+      <h2>Personalizar controles</h2>
+      <p class="hint">Clic en un botón y pulsa la tecla. Clic derecho también ataca/dispara.</p>
+      <div id="bindList"></div>
+      <div class="row" style="margin-top:14px">
+        <button class="btn ghost" id="resetKeys" type="button">Restablecer</button>
+        <button class="btn cyan" id="backFromControls" type="button" style="flex:1">Guardar y volver</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="tutorial" class="hidden">
+    <div class="card">
+      <h2>Cómo jugar</h2>
+      <div style="border-left:4px solid #67e8f9;padding:10px 14px;margin-bottom:8px;background:rgba(255,255,255,.04);border-radius:0 12px 12px 0">
+        <strong style="color:#a5f3fc">Armas</strong>
+        <p style="margin:4px 0 0;color:#a1a1aa;font-size:.9rem">
+          <b>Puños</b> melee · <b>Lanza</b> melee largo · <b>Pistola</b> tiro · <b>Ametralladora</b> ráfaga ·
+          <b>Granada</b> lanzas una bomba · <b>Escudo</b> absorbe daño (barra azul).
+        </p>
+      </div>
+      <div style="border-left:4px solid #67e8f9;padding:10px 14px;margin-bottom:8px;background:rgba(255,255,255,.04);border-radius:0 12px 12px 0">
+        <strong style="color:#a5f3fc">Recoger</strong>
+        <p style="margin:4px 0 0;color:#a1a1aa;font-size:.9rem">Camina sobre los objetos. El escudo suma protección. Las armas reemplazan la que llevas.</p>
+      </div>
+      <button class="btn cyan" id="backMenu" type="button" style="width:100%;margin-top:8px">Volver</button>
+    </div>
+  </section>
+
+  <section id="play" class="hidden" style="display:flex;flex-direction:column;gap:8px;flex:1">
+    <div class="hud">
+      <div class="bar">
+        <div class="top"><span id="pLabel">Tú</span><span id="pHp">100</span></div>
+        <div class="track"><div class="fill good" id="pFill" style="width:100%"></div></div>
+        <div class="track" style="margin-top:4px;height:6px"><div class="fill shield-fill" id="pShield" style="width:0%"></div></div>
+      </div>
+      <div style="min-width:110px;text-align:center;font-size:12px;color:#a1a1aa">
+        <div id="title" style="font-weight:800;color:#fff">Novato</div>
+        <div id="wlabel">Puños</div>
+        <div class="shield-badge" id="shieldLabel"></div>
+      </div>
+      <div class="bar">
+        <div class="top"><span>Enemigo</span><span id="eHp">80</span></div>
+        <div class="track"><div class="fill bad" id="eFill" style="width:100%"></div></div>
+        <div class="track" style="margin-top:4px;height:6px"><div class="fill shield-fill" id="eShield" style="width:0%"></div></div>
+      </div>
+    </div>
+    <div class="stage">
+      <canvas id="c"></canvas>
+      <div class="tip" id="tip"></div>
+      <div class="over" id="over">
+        <div class="confetti" id="confetti"></div>
+        <h2 id="overTitle" style="font-size:2.2rem;margin:0;position:relative;z-index:2">Victoria</h2>
+        <p id="overMsg" style="max-width:320px;color:#d4d4d8;position:relative;z-index:2"></p>
+        <div class="row" style="position:relative;z-index:2">
+          <button class="btn cyan" id="nextBtn" type="button">Siguiente</button>
+          <button class="btn cyan" id="retryBtn" type="button">Reintentar</button>
+          <button class="btn ghost" id="menuBtn" type="button">Menú</button>
+        </div>
+      </div>
+    </div>
+    <p class="help" id="helpText">A/D mover · W saltar · clic derecho atacar</p>
+    <div class="touch">
+      <button type="button" id="tL">◀</button>
+      <button type="button" id="tJ">Saltar</button>
+      <button type="button" id="tR">▶</button>
+      <button type="button" id="tA" class="wide">Atacar</button>
+    </div>
+  </section>
+</main>
+<script>
+const WORLD_W = 1280, WORLD_H = 720, GROUND = 628;
+const DB_KEY = "arena-accounts-v1";
+const SESSION_KEY = "arena-session-v1";
+const API_TOKEN_KEY = "arena-api-token";
+const API_STORE_KEY = "arena-embedded-api-v1";
+
+// === API embebida en el HTML (opciones 1+2+3, sin servidor) ===
+const ALL_WEAPONS = ["fists", "spear", "pistol", "machinegun", "grenade"];
+const UNLOCK_BY_LEVEL = {
+  1: ["fists", "pistol"],
+  2: ["spear"],
+  3: ["grenade"],
+  4: ["machinegun"],
+  5: [],
+  6: []
+};
+const TOKEN_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+function apiLoadStore() {
+  try {
+    return JSON.parse(localStorage.getItem(API_STORE_KEY) || "null") || { users: {}, tokens: {}, scores: [] };
+  } catch {
+    return { users: {}, tokens: {}, scores: [] };
+  }
+}
+function apiSaveStore(s) {
+  localStorage.setItem(API_STORE_KEY, JSON.stringify(s));
+}
+function apiUuid() {
+  return "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx".replace(/x/g, () => (Math.random() * 16 | 0).toString(16));
+}
+function apiHash(pass, salt) {
+  let h = 2166136261;
+  const str = salt + ":" + pass;
+  for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return (h >>> 0).toString(16);
+}
+function apiDefaultProgress(name) {
+  return {
+    unlocked: 1, bestWave: 0, bestKills: 0, tutorialDone: false,
+    keys: { left: ["KeyA","ArrowLeft"], right: ["KeyD","ArrowRight"], jump: ["KeyW","ArrowUp","Space"], attack: ["KeyF"] },
+    displayName: name || ""
+  };
+}
+function apiDefaultLoadout() {
+  return { unlockedWeapons: ["fists"], preferredWeapon: "fists", shieldUnlocked: false };
+}
+function apiApplyUnlocks(user) {
+  const unlocked = user.progress.unlocked || 1;
+  const set = new Set(user.loadout.unlockedWeapons || ["fists"]);
+  for (let lv = 1; lv <= unlocked; lv++) {
+    for (const w of (UNLOCK_BY_LEVEL[lv] || [])) set.add(w);
+  }
+  if (unlocked >= 2) user.loadout.shieldUnlocked = true;
+  user.loadout.unlockedWeapons = ALL_WEAPONS.filter(w => set.has(w));
+  if (!user.loadout.unlockedWeapons.includes(user.loadout.preferredWeapon)) {
+    user.loadout.preferredWeapon = user.loadout.unlockedWeapons[0] || "fists";
+  }
+}
+function apiPublicUser(u) {
+  return { id: u.id, username: u.username, displayName: u.progress.displayName || u.username, createdAt: u.createdAt };
+}
+function apiAuthUser(store) {
+  if (!apiToken) return null;
+  const entry = store.tokens[apiToken];
+  if (!entry || entry.expiresAt < Date.now()) return null;
+  return store.users[entry.username] || null;
+}
+
+/** API embebida: misma interfaz que el servidor Node */
+function embeddedApi(method, path, body) {
+  const store = apiLoadStore();
+  path = path.split("?")[0].replace(/\/$/, "") || "/";
+
+  if (method === "GET" && path === "/api/health") {
+    return { ok: true, service: "arena-embedded-api", version: "1.0.0", mode: "html" };
+  }
+
+  if (method === "POST" && path === "/api/auth/register") {
+    const username = String(body.username || "").trim().toLowerCase();
+    const password = String(body.password || "");
+    if (username.length < 3 || username.length > 16) throw new Error("Usuario entre 3 y 16 caracteres");
+    if (!/^[a-z0-9_]+$/.test(username)) throw new Error("Solo letras, números y _");
+    if (password.length < 4) throw new Error("Contraseña mínimo 4 caracteres");
+    if (store.users[username]) throw new Error("Ese usuario ya existe");
+    const salt = apiUuid().slice(0, 16);
+    const progress = apiDefaultProgress(username);
+    const user = {
+      id: apiUuid(), username, salt, passwordHash: apiHash(password, salt),
+      createdAt: new Date().toISOString(), progress, loadout: apiDefaultLoadout()
+    };
+    apiApplyUnlocks(user);
+    store.users[username] = user;
+    const token = apiUuid();
+    store.tokens[token] = { username, expiresAt: Date.now() + TOKEN_TTL_MS };
+    apiSaveStore(store);
+    return { token, user: apiPublicUser(user), progress: user.progress, loadout: user.loadout };
+  }
+
+  if (method === "POST" && path === "/api/auth/login") {
+    const username = String(body.username || "").trim().toLowerCase();
+    const password = String(body.password || "");
+    const user = store.users[username];
+    if (!user || user.passwordHash !== apiHash(password, user.salt))
+      throw new Error("Usuario o contraseña incorrectos");
+    const token = apiUuid();
+    store.tokens[token] = { username, expiresAt: Date.now() + TOKEN_TTL_MS };
+    apiApplyUnlocks(user);
+    apiSaveStore(store);
+    return { token, user: apiPublicUser(user), progress: user.progress, loadout: user.loadout };
+  }
+
+  if (method === "POST" && path === "/api/auth/logout") {
+    if (apiToken) delete store.tokens[apiToken];
+    apiSaveStore(store);
+    return { ok: true };
+  }
+
+  if (method === "GET" && path === "/api/me") {
+    const user = apiAuthUser(store);
+    if (!user) throw new Error("Token inválido o expirado");
+    apiApplyUnlocks(user);
+    apiSaveStore(store);
+    return { user: apiPublicUser(user), progress: user.progress, loadout: user.loadout };
+  }
+
+  if (method === "GET" && path === "/api/progress") {
+    const user = apiAuthUser(store);
+    if (!user) throw new Error("Token inválido o expirado");
+    return user.progress;
+  }
+
+  if (method === "PUT" && path === "/api/progress") {
+    const user = apiAuthUser(store);
+    if (!user) throw new Error("Token inválido o expirado");
+    const cur = user.progress;
+    const b = body || {};
+    if (typeof b.unlocked === "number") cur.unlocked = Math.min(6, Math.max(1, Math.floor(b.unlocked)));
+    if (typeof b.bestWave === "number") cur.bestWave = Math.max(cur.bestWave, Math.floor(b.bestWave));
+    if (typeof b.bestKills === "number") cur.bestKills = Math.max(cur.bestKills, Math.floor(b.bestKills));
+    if (typeof b.tutorialDone === "boolean") cur.tutorialDone = b.tutorialDone;
+    if (b.keys && typeof b.keys === "object") cur.keys = b.keys;
+    if (typeof b.displayName === "string") cur.displayName = b.displayName.slice(0, 16);
+    apiApplyUnlocks(user);
+    apiSaveStore(store);
+    return { progress: user.progress, loadout: user.loadout };
+  }
+
+  if (method === "POST" && path === "/api/scores") {
+    const user = apiAuthUser(store);
+    if (!user) throw new Error("Token inválido o expirado");
+    const wave = Math.max(0, Math.floor(Number(body.wave) || 0));
+    const kills = Math.max(0, Math.floor(Number(body.kills) || 0));
+    const durationSec = Math.max(0, Math.floor(Number(body.durationSec) || 0));
+    if (wave <= 0 && kills <= 0) throw new Error("Score vacío");
+    const entry = {
+      id: apiUuid(), username: user.username,
+      displayName: user.progress.displayName || user.username,
+      wave, kills, durationSec, createdAt: new Date().toISOString()
+    };
+    store.scores.push(entry);
+    if (wave > user.progress.bestWave) user.progress.bestWave = wave;
+    if (kills > user.progress.bestKills) user.progress.bestKills = kills;
+    if (store.scores.length > 2000) store.scores = store.scores.slice(-1500);
+    apiSaveStore(store);
+    return { score: entry, progress: user.progress };
+  }
+
+  if (method === "GET" && path === "/api/leaderboard") {
+    const best = new Map();
+    for (const s of store.scores) {
+      const prev = best.get(s.username);
+      if (!prev || s.wave > prev.wave || (s.wave === prev.wave && s.kills > prev.kills)) best.set(s.username, s);
+    }
+    return [...best.values()]
+      .sort((a, b) => b.wave - a.wave || b.kills - a.kills)
+      .slice(0, 15)
+      .map((s, i) => ({
+        rank: i + 1, username: s.username, displayName: s.displayName,
+        wave: s.wave, kills: s.kills, durationSec: s.durationSec
+      }));
+  }
+
+  if (method === "GET" && path === "/api/leaderboard/me") {
+    const user = apiAuthUser(store);
+    if (!user) throw new Error("Token inválido o expirado");
+    const mine = store.scores.filter(s => s.username === user.username);
+    let best = null;
+    for (const s of mine) {
+      if (!best || s.wave > best.wave || (s.wave === best.wave && s.kills > best.kills)) best = s;
+    }
+    const bestMap = new Map();
+    for (const s of store.scores) {
+      const prev = bestMap.get(s.username);
+      if (!prev || s.wave > prev.wave || (s.wave === prev.wave && s.kills > prev.kills)) bestMap.set(s.username, s);
+    }
+    const sorted = [...bestMap.values()].sort((a, b) => b.wave - a.wave || b.kills - a.kills);
+    const rank = best ? sorted.findIndex(s => s.username === user.username) + 1 : null;
+    return { rank, best, totalPlayers: sorted.length };
+  }
+
+  if (method === "GET" && path === "/api/loadout") {
+    const user = apiAuthUser(store);
+    if (!user) throw new Error("Token inválido o expirado");
+    apiApplyUnlocks(user);
+    apiSaveStore(store);
+    return user.loadout;
+  }
+
+  if (method === "PUT" && path === "/api/loadout") {
+    const user = apiAuthUser(store);
+    if (!user) throw new Error("Token inválido o expirado");
+    apiApplyUnlocks(user);
+    const preferred = String((body && body.preferredWeapon) || "");
+    if (preferred && user.loadout.unlockedWeapons.includes(preferred)) {
+      user.loadout.preferredWeapon = preferred;
+    }
+    apiSaveStore(store);
+    return user.loadout;
+  }
+
+  if (method === "GET" && path === "/api/unlocks") {
+    const user = apiAuthUser(store);
+    if (!user) throw new Error("Token inválido o expirado");
+    apiApplyUnlocks(user);
+    apiSaveStore(store);
+    return {
+      weapons: ALL_WEAPONS.map(w => ({ id: w, unlocked: user.loadout.unlockedWeapons.includes(w) })),
+      shieldUnlocked: !!user.loadout.shieldUnlocked,
+      unlockTable: UNLOCK_BY_LEVEL
+    };
+  }
+
+  throw new Error("Ruta no encontrada: " + path);
+}
+
+let apiToken = localStorage.getItem(API_TOKEN_KEY) || null;
+let apiOnline = true; // siempre online: API dentro del HTML
+let loadout = { unlockedWeapons: ["fists", "pistol"], preferredWeapon: "fists", shieldUnlocked: false };
+let useApiAuth = false;
+
+async function apiReq(method, path, body) {
+  // API 100% dentro del HTML (localStorage)
+  return embeddedApi(method, path, body || {});
+}
+function setApiToken(t) {
+  apiToken = t;
+  if (t) localStorage.setItem(API_TOKEN_KEY, t);
+  else localStorage.removeItem(API_TOKEN_KEY);
+}
+async function checkApi() {
+  try {
+    await apiReq("GET", "/api/health");
+    apiOnline = true;
+  } catch {
+    apiOnline = false;
+  }
+  const el = document.getElementById("apiStatus");
+  if (el) el.textContent = apiOnline
+    ? "API: integrada en el HTML (guardado local)"
+    : "API: error";
+  return apiOnline;
+}
+async function refreshLeaderboard() {
+  const box = document.getElementById("leaderboardBox");
+  if (!box) return;
+  try {
+    const list = await apiReq("GET", "/api/leaderboard?limit=15");
+    if (!list.length) {
+      box.innerHTML = "<span style=\"color:#71717a\">Aún no hay scores — juega Supervivencia con cuenta</span>";
+      return;
+    }
+    box.innerHTML = list.map(r =>
+      `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.06)">
+        <span><b style="color:#67e8f9">#${r.rank}</b> ${r.displayName || r.username}</span>
+        <span>Oleada <b>${r.wave}</b> · ${r.kills} bajas</span>
+      </div>`
+    ).join("");
+  } catch (e) {
+    box.innerHTML = "<span style=\"color:#fb7185\">" + e.message + "</span>";
+  }
+}
+
+
+const MAX_SHIELD = 50;
+
+const WEAPON = {
+  fists: { label: "Puños", type: "melee", dmg: [7, 11], range: 52, cd: 0.32, color: "#fbbf24" },
+  spear: { label: "Lanza", type: "melee", dmg: [20, 30], range: 120, cd: 0.55, color: "#fb7185" },
+  pistol: { label: "Pistola", type: "gun", dmg: [14, 20], range: 520, cd: 0.42, color: "#67e8f9", bulletSpeed: 780, bulletSize: 5 },
+  machinegun: { label: "Ametralladora", type: "gun", dmg: [5, 9], range: 480, cd: 0.09, color: "#a78bfa", bulletSpeed: 900, bulletSize: 3.5 },
+  grenade: { label: "Granada", type: "throw", dmg: [28, 40], range: 400, cd: 0.9, color: "#f97316", throwSpeed: 420 }
+};
+
+const LEVELS = [
+  { id:1, name:"Novato", hp:55, dmg:4, speed:110, plats:[{x:320,y:540,w:200,h:16},{x:760,y:540,w:200,h:16}] },
+  { id:2, name:"Aprendiz", hp:85, dmg:6, speed:135, plats:[{x:200,y:540,w:140,h:16},{x:380,y:460,w:140,h:16},{x:820,y:500,w:180,h:16}] },
+  { id:3, name:"Guerrero", hp:130, dmg:9, speed:160, plats:[{x:160,y:520,w:150,h:16},{x:200,y:400,w:120,h:16},{x:920,y:520,w:150,h:16},{x:960,y:400,w:120,h:16},{x:520,y:450,w:200,h:16}] },
+  { id:4, name:"Veterano", hp:180, dmg:13, speed:185, plats:[{x:80,y:500,w:160,h:16},{x:120,y:380,w:130,h:16},{x:100,y:260,w:140,h:16},{x:700,y:520,w:160,h:16},{x:980,y:400,w:180,h:16},{x:560,y:340,w:140,h:16}] },
+  { id:5, name:"Élite", hp:240, dmg:17, speed:210, plats:[{x:140,y:540,w:100,h:16},{x:280,y:450,w:100,h:16},{x:420,y:360,w:100,h:16},{x:560,y:270,w:140,h:16},{x:820,y:480,w:120,h:16},{x:1000,y:360,w:140,h:16},{x:720,y:200,w:110,h:16}] },
+  { id:6, name:"Campeón", hp:340, dmg:22, speed:245, plats:[{x:70,y:520,w:100,h:16},{x:210,y:420,w:90,h:16},{x:340,y:310,w:90,h:16},{x:480,y:200,w:160,h:16},{x:760,y:280,w:110,h:16},{x:940,y:390,w:110,h:16},{x:1100,y:510,w:110,h:16},{x:620,y:450,w:100,h:16}] }
+];
+
+const DEFAULT_KEYS = {
+  left: ["KeyA", "ArrowLeft"], right: ["KeyD", "ArrowRight"],
+  jump: ["KeyW", "ArrowUp", "Space"], attack: ["KeyF"]
+};
+const BIND_LABELS = { left: "Izquierda", right: "Derecha", jump: "Saltar", attack: "Atacar / Disparar" };
+const CODE_NAMES = {
+  KeyA:"A",KeyB:"B",KeyC:"C",KeyD:"D",KeyE:"E",KeyF:"F",KeyG:"G",KeyH:"H",KeyI:"I",KeyJ:"J",KeyK:"K",KeyL:"L",
+  KeyM:"M",KeyN:"N",KeyO:"O",KeyP:"P",KeyQ:"Q",KeyR:"R",KeyS:"S",KeyT:"T",KeyU:"U",KeyV:"V",KeyW:"W",KeyX:"X",
+  KeyY:"Y",KeyZ:"Z",ArrowLeft:"←",ArrowRight:"→",ArrowUp:"↑",ArrowDown:"↓",Space:"Espacio",
+  Digit1:"1",Digit2:"2",Digit3:"3",Digit4:"4",Digit5:"5",Digit6:"6",Digit7:"7",Digit8:"8",Digit9:"9",Digit0:"0"
+};
+
+function loadDB() { try { return JSON.parse(localStorage.getItem(DB_KEY) || "{}") || {}; } catch { return {}; } }
+function saveDB(db) { localStorage.setItem(DB_KEY, JSON.stringify(db)); }
+function hashPass(s) {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+  return (h >>> 0).toString(16);
+}
+function defaultProgress() {
+  return { unlocked: 1, bestWave: 0, bestKills: 0, tutorialDone: false,
+    keys: JSON.parse(JSON.stringify(DEFAULT_KEYS)), displayName: "" };
+}
+function getSession() { try { return JSON.parse(sessionStorage.getItem(SESSION_KEY) || "null"); } catch { return null; } }
+function setSession(user) {
+  if (user) sessionStorage.setItem(SESSION_KEY, JSON.stringify({ user }));
+  else sessionStorage.removeItem(SESSION_KEY);
+}
+
+let currentUser = null;
+let save = defaultProgress();
+let sim = null, raf = 0, mode = "level", level = 1, listening = null;
+const keys = new Set();
+const canvas = document.getElementById("c");
+const ctx = canvas.getContext("2d");
+
+function loadProgress() {
+  if (!currentUser) {
+    try {
+      const g = JSON.parse(localStorage.getItem("arena-guest-v1") || "null");
+      if (g) { save = { ...defaultProgress(), ...g }; normalizeKeys(); return; }
+    } catch {}
+    save = defaultProgress(); return;
+  }
+  const db = loadDB();
+  const acc = db[currentUser];
+  if (acc && acc.progress) {
+    save = { ...defaultProgress(), ...acc.progress };
+    if (!save.displayName) save.displayName = currentUser;
+  } else { save = defaultProgress(); save.displayName = currentUser; }
+  normalizeKeys();
+}
+function normalizeKeys() {
+  for (const k of Object.keys(DEFAULT_KEYS)) {
+    if (!Array.isArray(save.keys[k]) || !save.keys[k].length) save.keys[k] = [...DEFAULT_KEYS[k]];
+  }
+}
+function persistLocalOnly() {
+  if (!currentUser) { localStorage.setItem("arena-guest-v1", JSON.stringify(save)); return; }
+  const db = loadDB();
+  if (!db[currentUser]) {
+    db[currentUser] = { pass: "", progress: save };
+  } else {
+    db[currentUser].progress = save;
+  }
+  saveDB(db);
+}
+async function persist() {
+  persistLocalOnly();
+  if (useApiAuth && apiToken && apiOnline) {
+    try {
+      const data = await apiReq("PUT", "/api/progress", {
+        unlocked: save.unlocked,
+        bestWave: save.bestWave,
+        bestKills: save.bestKills,
+        tutorialDone: save.tutorialDone,
+        keys: save.keys,
+        displayName: save.displayName || currentUser
+      });
+      if (data.loadout) loadout = data.loadout;
+      if (data.progress) save = { ...save, ...data.progress };
+    } catch (e) {
+      console.warn("API save failed", e.message);
+    }
+  }
+}
+function show(id) {
+  for (const s of ["auth","menu","tutorial","controls","play"]) {
+    const el = document.getElementById(s);
+    if (el) el.classList.toggle("hidden", s !== id);
+  }
+  document.getElementById("play").style.display = id === "play" ? "flex" : "none";
+}
+function keyLabel(code) { return CODE_NAMES[code] || code.replace(/^Key/,"").replace(/^Digit/,"") || code; }
+function updateAccountBadge() {
+  const b = document.getElementById("accountBadge");
+  b.innerHTML = currentUser ? `Cuenta <b>${currentUser}</b>` : "Invitado";
+}
+function paintMenu() {
+  updateAccountBadge();
+  document.getElementById("menuAccountHint").textContent = currentUser
+    ? (`Conectado como ${currentUser}. ` + (useApiAuth ? "Progreso en API + local." : "Progreso local."))
+    : "Modo invitado: progreso temporal en este navegador.";
+  checkApi().then(() => refreshLeaderboard());
+  document.getElementById("best").textContent = save.bestWave ? "Mejor oleada " + save.bestWave + " · bajas " + save.bestKills : "";
+  const box = document.getElementById("levels");
+  box.innerHTML = "";
+  for (const lv of LEVELS) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "lv" + (lv.id <= save.unlocked ? " on" : "");
+    b.textContent = lv.id <= save.unlocked ? lv.id : "·";
+    b.disabled = lv.id > save.unlocked;
+    b.onclick = () => start("level", lv.id);
+    box.appendChild(b);
+  }
+  updateHelpText();
+}
+function updateHelpText() {
+  const k = save.keys;
+  document.getElementById("helpText").textContent =
+    keyLabel(k.left[0]) + "/" + keyLabel(k.right[0]) + " mover · " +
+    keyLabel(k.jump[0]) + " saltar · " + keyLabel(k.attack[0]) + " o clic derecho atacar";
+}
+function paintControls() {
+  const list = document.getElementById("bindList");
+  list.innerHTML = "";
+  for (const action of ["left","right","jump","attack"]) {
+    const row = document.createElement("div");
+    row.className = "bind-row";
+    const labels = save.keys[action].map(c => `<span class="kbd">${keyLabel(c)}</span>`).join(" ");
+    row.innerHTML = `<span class="bind-label">${BIND_LABELS[action]}</span>`;
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "bind-btn" + (listening === action ? " listening" : "");
+    btn.innerHTML = listening === action ? "Pulsa una tecla…" : labels;
+    btn.onclick = () => { listening = action; paintControls(); };
+    row.appendChild(btn);
+    list.appendChild(row);
+  }
+}
+
+document.getElementById("tabLogin").onclick = () => {
+  document.getElementById("tabLogin").classList.add("active");
+  document.getElementById("tabRegister").classList.remove("active");
+  document.getElementById("loginBox").classList.remove("hidden");
+  document.getElementById("registerBox").classList.add("hidden");
+};
+document.getElementById("tabRegister").onclick = () => {
+  document.getElementById("tabRegister").classList.add("active");
+  document.getElementById("tabLogin").classList.remove("active");
+  document.getElementById("registerBox").classList.remove("hidden");
+  document.getElementById("loginBox").classList.add("hidden");
+};
+document.getElementById("doRegister").onclick = async () => {
+  const user = document.getElementById("regUser").value.trim().toLowerCase();
+  const pass = document.getElementById("regPass").value;
+  const pass2 = document.getElementById("regPass2").value;
+  const err = document.getElementById("regErr");
+  err.textContent = "";
+  if (user.length < 3 || user.length > 16) { err.textContent = "Usuario entre 3 y 16 caracteres."; return; }
+  if (!/^[a-z0-9_]+$/.test(user)) { err.textContent = "Solo letras, números y _."; return; }
+  if (pass.length < 4) { err.textContent = "Contraseña mínimo 4 caracteres."; return; }
+  if (pass !== pass2) { err.textContent = "Las contraseñas no coinciden."; return; }
+  await checkApi();
+  if (apiOnline) {
+    try {
+      const data = await apiReq("POST", "/api/auth/register", { username: user, password: pass });
+      setApiToken(data.token);
+      useApiAuth = true;
+      currentUser = data.user.username;
+      setSession(currentUser);
+      save = { ...defaultProgress(), ...data.progress };
+      if (data.loadout) loadout = data.loadout;
+      normalizeKeys();
+      persistLocalOnly();
+      paintMenu();
+      await refreshLeaderboard();
+      show("menu");
+      return;
+    } catch (e) {
+      err.textContent = e.message + " — intentando local…";
+    }
+  }
+  const db = loadDB();
+  if (db[user]) { err.textContent = "Ese usuario ya existe."; return; }
+  db[user] = { pass: hashPass(pass), progress: defaultProgress() };
+  db[user].progress.displayName = user;
+  saveDB(db);
+  useApiAuth = false; setApiToken(null);
+  currentUser = user; setSession(user); loadProgress(); paintMenu(); show("menu");
+};
+document.getElementById("doLogin").onclick = async () => {
+  const user = document.getElementById("loginUser").value.trim().toLowerCase();
+  const pass = document.getElementById("loginPass").value;
+  const err = document.getElementById("loginErr");
+  err.textContent = "";
+  await checkApi();
+  if (apiOnline) {
+    try {
+      const data = await apiReq("POST", "/api/auth/login", { username: user, password: pass });
+      setApiToken(data.token);
+      useApiAuth = true;
+      currentUser = data.user.username;
+      setSession(currentUser);
+      save = { ...defaultProgress(), ...data.progress };
+      if (data.loadout) loadout = data.loadout;
+      normalizeKeys();
+      persistLocalOnly();
+      paintMenu();
+      await refreshLeaderboard();
+      show("menu");
+      return;
+    } catch (e) {
+      err.textContent = e.message;
+      // fallback local
+    }
+  }
+  const db = loadDB();
+  if (!db[user] || db[user].pass !== hashPass(pass)) {
+    if (!err.textContent) err.textContent = "Usuario o contraseña incorrectos.";
+    return;
+  }
+  useApiAuth = false; setApiToken(null);
+  currentUser = user; setSession(user); loadProgress(); paintMenu(); show("menu");
+};
+document.getElementById("playGuest").onclick = () => {
+  setApiToken(null); useApiAuth = false;
+  currentUser = null; setSession(null); loadProgress(); paintMenu(); show("menu");
+};
+document.getElementById("logoutBtn").onclick = async () => {
+  await persist();
+  if (apiOnline && apiToken) {
+    try { await apiReq("POST", "/api/auth/logout"); } catch {}
+  }
+  setApiToken(null); useApiAuth = false;
+  currentUser = null; setSession(null); save = defaultProgress();
+  document.getElementById("loginErr").textContent = "";
+  document.getElementById("regErr").textContent = "";
+  show("auth"); updateAccountBadge();
+};
+document.getElementById("refreshBoard").onclick = () => refreshLeaderboard();
+
+function fighter(x, hp, weapon) {
+  return { x, y: GROUND - 64, w: 28, h: 64, vx: 0, vy: 0, hp, maxHp: hp, facing: 1, grounded: true,
+    weapon, swing: 0, cooldown: 0, flash: 0, hitDone: false, shield: 0, maxShield: MAX_SHIELD };
+}
+function boot(m, lv) {
+  const def = LEVELS[(m === "survival" ? 1 : lv) - 1];
+  const enemy = fighter(1040, m === "survival" ? 90 : def.hp, "fists");
+  enemy.facing = -1;
+  const showTut = m === "level" && lv === 1 && !save.tutorialDone;
+  return {
+    player: fighter(90, m === "survival" ? 130 : 100, "fists"), enemy,
+    drops: [], bullets: [], grenades: [], explosions: [],
+    plats: (m === "survival" ? LEVELS[2] : def).plats,
+    mode: m, level: lv, wave: 1, kills: 0, nextId: 1, spawnIn: 1.2,
+    enemySpeed: m === "survival" ? 160 : def.speed, enemyDmg: m === "survival" ? 8 : def.dmg,
+    over: null, shake: 0, floats: [], particles: [], wantAttack: false, holdAttack: false,
+    tipIndex: showTut ? 0 : -1, tipTimer: showTut ? 0.6 : 0, tipShown: false, winAnim: false
+  };
+}
+const TIPS = [
+  { text: "← →  Muévete", check: s => Math.abs(s.player.vx) > 30 },
+  { text: "⬆  Salta a las plataformas", check: s => !s.player.grounded || s.player.y < GROUND - 80 },
+  { text: "⚔  Ataca o dispara", check: s => s.player.swing > 0 || s.bullets.some(b => b.owner === "player") || s.grenades.some(g => g.owner === "player") },
+  { text: "🔫  Recoge armas, granadas o escudos", check: s => s.player.weapon !== "fists" || s.player.shield > 0 },
+  { text: "¡Listo! Derrota al enemigo", check: () => false }
+];
+function overlap(a, b) { return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y; }
+function clampX(body) { if (body.x < 16) body.x = 16; if (body.x + body.w > WORLD_W - 16) body.x = WORLD_W - 16 - body.w; }
+function land(body, prevBottom, plats) {
+  const bottom = body.y + body.h; let grounded = false;
+  if (body.vy >= 0 && prevBottom <= GROUND + 1 && bottom >= GROUND) { body.y = GROUND - body.h; body.vy = 0; grounded = true; }
+  else if (body.vy >= 0) {
+    for (const p of plats) {
+      if (!(body.x + body.w > p.x + 6 && body.x < p.x + p.w - 6)) continue;
+      if (prevBottom <= p.y + 8 && bottom >= p.y && bottom <= p.y + 28) { body.y = p.y - body.h; body.vy = 0; grounded = true; break; }
+    }
+  }
+  return grounded;
+}
+function stepBody(body, dt, plats, input) {
+  if (input.left) { body.vx = -input.speed; body.facing = -1; }
+  else if (input.right) { body.vx = input.speed; body.facing = 1; }
+  else body.vx *= body.grounded ? 0.2 : 0.92;
+  if (input.jump && body.grounded) { body.vy = -620; body.grounded = false; }
+  body.vy = Math.min(900, body.vy + 1700 * dt);
+  body.x += body.vx * dt; clampX(body);
+  const prev = body.y + body.h; body.y += body.vy * dt;
+  body.grounded = land(body, prev, plats);
+  if (body.y < 8) { body.y = 8; body.vy = 0; }
+}
+function swingHit(a, d) {
+  if (a.swing <= 0 || a.hitDone) return 0;
+  const spec = WEAPON[a.weapon];
+  if (!spec || spec.type !== "melee") return 0;
+  const ax = a.facing === 1 ? a.x + a.w : a.x - spec.range;
+  if (!overlap({ x: ax, y: a.y + 8, w: spec.range, h: a.h - 10 }, d)) return 0;
+  a.hitDone = true;
+  const [lo, hi] = spec.dmg;
+  return Math.round(lo + Math.random() * (hi - lo));
+}
+function applyDamage(who, amount, color) {
+  if (who.shield > 0) {
+    const absorbed = Math.min(who.shield, amount);
+    who.shield -= absorbed; amount -= absorbed;
+    sim.floats.push({ x: who.x + who.w / 2, y: who.y - 8, t: "🛡-" + absorbed, life: 0.55, color: "#60a5fa" });
+    for (let i = 0; i < 4; i++) sim.particles.push({ x: who.x + who.w / 2, y: who.y + who.h / 2, vx: (Math.random() - 0.5) * 160, vy: (Math.random() - 0.5) * 160, life: 0.25, color: "#60a5fa", size: 2 });
+  }
+  if (amount <= 0) return;
+  who.hp = Math.max(0, who.hp - amount); who.flash = 0.18; sim.shake = 0.12;
+  sim.floats.push({ x: who.x + who.w / 2, y: who.y, t: "-" + amount, life: 0.7, color });
+  for (let i = 0; i < 5; i++) sim.particles.push({ x: who.x + who.w / 2, y: who.y + who.h / 2, vx: (Math.random() - 0.5) * 220, vy: (Math.random() - 0.8) * 180, life: 0.3, color, size: 2 + Math.random() * 3 });
+}
+function fireBullet(owner, fighter) {
+  const spec = WEAPON[fighter.weapon];
+  if (spec.type !== "gun") return;
+  const [lo, hi] = spec.dmg;
+  const dmg = Math.round(lo + Math.random() * (hi - lo));
+  const finalDmg = owner === "enemy" ? Math.max(3, Math.round(dmg * 0.4 + sim.enemyDmg * 0.35)) : dmg;
+  const mx = fighter.x + fighter.w / 2 + fighter.facing * 28, my = fighter.y + 26;
+  sim.bullets.push({ x: mx, y: my, vx: fighter.facing * spec.bulletSpeed, vy: (Math.random() - 0.5) * (fighter.weapon === "machinegun" ? 40 : 12), owner, dmg: finalDmg, color: spec.color, size: spec.bulletSize, life: 1.4 });
+}
+function throwGrenade(owner, fighter) {
+  const [lo, hi] = WEAPON.grenade.dmg;
+  const dmg = Math.round(lo + Math.random() * (hi - lo));
+  const finalDmg = owner === "enemy" ? Math.max(10, Math.round(dmg * 0.45 + sim.enemyDmg * 0.4)) : dmg;
+  sim.grenades.push({ x: fighter.x + fighter.w / 2 + fighter.facing * 20, y: fighter.y + 20, w: 14, h: 14, vx: fighter.facing * WEAPON.grenade.throwSpeed + fighter.vx * 0.3, vy: -280, owner, dmg: finalDmg, fuse: 1.35 });
+}
+function explode(x, y, dmg, owner) {
+  sim.explosions.push({ x, y, r: 8, maxR: 90, life: 0.45 });
+  sim.shake = 0.25;
+  for (let i = 0; i < 18; i++) {
+    const ang = Math.random() * Math.PI * 2, sp = 80 + Math.random() * 200;
+    sim.particles.push({ x, y, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp, life: 0.4, color: Math.random() > 0.5 ? "#f97316" : "#fbbf24", size: 2 + Math.random() * 4 });
+  }
+  const t = owner === "player" ? sim.enemy : sim.player;
+  const dist = Math.hypot(t.x + t.w / 2 - x, t.y + t.h / 2 - y);
+  if (dist < 100) applyDamage(t, Math.round(dmg * (0.45 + (1 - dist / 100) * 0.55)), owner === "player" ? "#86efac" : "#fda4af");
+}
+function tryAttack(fighter, owner) {
+  const spec = WEAPON[fighter.weapon];
+  if (!spec || fighter.cooldown > 0) return;
+  if (spec.type === "gun") { fighter.cooldown = spec.cd; fighter.swing = 0.08; fireBullet(owner, fighter); }
+  else if (spec.type === "throw") { fighter.cooldown = spec.cd; fighter.swing = 0.14; throwGrenade(owner, fighter); }
+  else { if (fighter.swing > 0) return; fighter.swing = 0.16; fighter.cooldown = spec.cd; fighter.hitDone = false; }
+}
+function randomDrop() {
+  const r = Math.random();
+  if (r < 0.22) return "pistol"; if (r < 0.40) return "machinegun"; if (r < 0.55) return "spear";
+  if (r < 0.72) return "grenade"; if (r < 0.90) return "shield"; return "pistol";
+}
+function spawnDrop(kind, x, y) {
+  sim.drops.push({ id: sim.nextId++, kind: kind || randomDrop(), x: x == null ? 80 + Math.random() * (WORLD_W - 200) : x, y: y == null ? -40 : y, w: 22, h: 22, vx: 0, vy: 0 });
+}
+function pressed(action) { return save.keys[action].some(c => keys.has(c)); }
+function pickupItem(fighter, drop) {
+  if (drop.kind === "shield") {
+    fighter.shield = Math.min(fighter.maxShield, fighter.shield + 35);
+    for (let i = 0; i < 10; i++) sim.particles.push({ x: drop.x + 11, y: drop.y + 11, vx: (Math.random() - 0.5) * 100, vy: (Math.random() - 0.5) * 100, life: 0.45, color: "#60a5fa", size: 2 });
+  } else if (WEAPON[drop.kind]) {
+    fighter.weapon = drop.kind;
+    for (let i = 0; i < 8; i++) sim.particles.push({ x: drop.x + 11, y: drop.y + 11, vx: (Math.random() - 0.5) * 120, vy: (Math.random() - 0.5) * 120, life: 0.4, color: WEAPON[drop.kind].color, size: 2 });
+  }
+}
+function step(dt) {
+  if (!sim || sim.over) return;
+  const p = sim.player, e = sim.enemy;
+  if (sim.tipIndex >= 0 && sim.tipIndex < TIPS.length) {
+    sim.tipTimer -= dt;
+    const tip = TIPS[sim.tipIndex];
+    if (!sim.tipShown && sim.tipTimer <= 0) { sim.tipShown = true; const el = document.getElementById("tip"); el.textContent = tip.text; el.classList.add("show"); }
+    if (sim.tipShown && tip.check(sim)) {
+      document.getElementById("tip").classList.remove("show");
+      sim.tipIndex++; sim.tipShown = false; sim.tipTimer = 0.8;
+      if (sim.tipIndex >= TIPS.length) { save.tutorialDone = true; persist(); sim.tipIndex = -1; }
+    }
+  }
+  stepBody(p, dt, sim.plats, { left: pressed("left"), right: pressed("right"), jump: pressed("jump"), speed: 250 });
+  if (p.cooldown > 0) p.cooldown -= dt;
+  if (p.swing > 0) { p.swing -= dt; const dmg = swingHit(p, e); if (dmg) applyDamage(e, dmg, "#86efac"); }
+  if (sim.wantAttack || sim.holdAttack || pressed("attack")) tryAttack(p, "player");
+  sim.wantAttack = false; if (p.flash > 0) p.flash -= dt;
+
+  const dx = p.x - e.x; e.facing = dx >= 0 ? 1 : -1;
+  const dist = Math.abs(dx), espec = WEAPON[e.weapon] || WEAPON.fists;
+  const ideal = espec.type === "gun" || espec.type === "throw" ? 240 : espec.range * 0.7;
+  const tooFar = dist > ideal + 40, tooClose = dist < (espec.type === "gun" || espec.type === "throw" ? 100 : espec.range * 0.4);
+  let ejump = false;
+  if (e.grounded && p.y + 24 < e.y && dist < 280 && Math.random() < 0.05) ejump = true;
+  let eLeft = false, eRight = false;
+  if (tooFar) { eLeft = dx < 0; eRight = dx > 0; }
+  else if (tooClose && (espec.type === "gun" || espec.type === "throw")) { eLeft = dx > 0; eRight = dx < 0; }
+  stepBody(e, dt, sim.plats, { left: eLeft, right: eRight, jump: ejump, speed: sim.enemySpeed });
+  if (e.cooldown > 0) e.cooldown -= dt;
+  if (e.swing > 0) { e.swing -= dt; const raw = swingHit(e, p); if (raw) applyDamage(p, Math.max(4, Math.round(raw * 0.35 + sim.enemyDmg * 0.45)), "#fda4af"); }
+  if (e.flash > 0) e.flash -= dt;
+  if (dist < (espec.type === "gun" || espec.type === "throw" ? espec.range : espec.range + 12) && e.cooldown <= 0) {
+    e.facing = dx >= 0 ? 1 : -1;
+    if (espec.type === "melee" && dist < espec.range + 8) tryAttack(e, "enemy");
+    else if (espec.type !== "melee") tryAttack(e, "enemy");
+  }
+
+  for (const d of [...sim.drops]) {
+    if (overlap(p, { x: d.x - 8, y: d.y - 8, w: d.w + 16, h: d.h + 16 })) {
+      if (d.kind === "shield" || WEAPON[d.kind]) { pickupItem(p, d); sim.drops = sim.drops.filter(x => x.id !== d.id); }
+    }
+    if (Math.hypot(d.x - e.x, d.y - e.y) < 48 && d.y > 40) {
+      if (d.kind === "shield" && e.shield < 20 && Math.random() < 0.5) { pickupItem(e, d); sim.drops = sim.drops.filter(x => x.id !== d.id); }
+      else if (e.weapon === "fists" && WEAPON[d.kind] && Math.random() < 0.4) { pickupItem(e, d); sim.drops = sim.drops.filter(x => x.id !== d.id); }
+    }
+  }
+  sim.spawnIn -= dt;
+  if (sim.spawnIn <= 0 && sim.drops.length < 5) { spawnDrop(); sim.spawnIn = 2.0 + Math.random() * 1.5; }
+  for (const d of sim.drops) {
+    d.vy += 1700 * dt; d.x += d.vx * dt;
+    const prev = d.y + d.h; d.y += d.vy * dt;
+    if (land(d, prev, sim.plats)) d.vx *= 0.6; clampX(d);
+  }
+  const nextB = [];
+  for (const b of sim.bullets) {
+    b.x += b.vx * dt; b.y += b.vy * dt; b.life -= dt;
+    if (b.life <= 0 || b.x < -20 || b.x > WORLD_W + 20) continue;
+    const target = b.owner === "player" ? e : p;
+    if (overlap({ x: b.x - b.size, y: b.y - b.size, w: b.size * 2, h: b.size * 2 }, { x: target.x, y: target.y + 4, w: target.w, h: target.h - 8 })) {
+      applyDamage(target, b.dmg, b.owner === "player" ? "#86efac" : "#fda4af"); continue;
+    }
+    if (b.y + b.size >= GROUND) continue;
+    let blocked = false;
+    for (const pl of sim.plats) if (b.x > pl.x && b.x < pl.x + pl.w && b.y > pl.y && b.y < pl.y + pl.h + 4) { blocked = true; break; }
+    if (!blocked) nextB.push(b);
+  }
+  sim.bullets = nextB;
+  const nextG = [];
+  for (const g of sim.grenades) {
+    g.vy += 1400 * dt; g.x += g.vx * dt;
+    const prev = g.y + g.h; g.y += g.vy * dt; g.fuse -= dt;
+    if (land(g, prev, sim.plats)) { g.vy *= -0.35; g.vx *= 0.7; }
+    clampX(g);
+    if (g.y + g.h >= GROUND) { g.y = GROUND - g.h; g.vy *= -0.3; g.vx *= 0.75; }
+    if (g.fuse <= 0) { explode(g.x + 7, g.y + 7, g.dmg, g.owner); continue; }
+    nextG.push(g);
+  }
+  sim.grenades = nextG;
+  for (const ex of sim.explosions) { ex.life -= dt; ex.r = ex.maxR * (1 - ex.life / 0.45); }
+  sim.explosions = sim.explosions.filter(ex => ex.life > 0);
+  sim.floats = sim.floats.filter(f => { f.y -= 40 * dt; f.life -= dt; return f.life > 0; });
+  sim.particles = sim.particles.filter(pt => { pt.x += pt.vx * dt; pt.y += pt.vy * dt; pt.vy += 400 * dt; pt.life -= dt; return pt.life > 0; });
+  if (sim.shake > 0) sim.shake -= dt;
+  if (e.hp <= 0) {
+    if (sim.mode === "survival") {
+      sim.kills++; sim.wave++;
+      const nx = e.x > WORLD_W / 2 ? 80 : WORLD_W - 120;
+      sim.enemy = fighter(nx, 80 + sim.wave * 28, ["fists","pistol","spear","grenade"][Math.floor(Math.random()*4)]);
+      sim.enemy.facing = nx < p.x ? 1 : -1;
+      sim.enemySpeed = 150 + sim.wave * 12; sim.enemyDmg = 7 + sim.wave * 2;
+      p.hp = Math.min(p.maxHp, p.hp + 22);
+      sim.plats = LEVELS[(sim.wave - 1) % LEVELS.length].plats;
+    } else { sim.over = "win"; sim.winAnim = true; spawnConfetti(); }
+  }
+  if (p.hp <= 0) sim.over = "lose";
+}
+function spawnConfetti() {
+  const box = document.getElementById("confetti"); box.innerHTML = "";
+  const colors = ["#22d3ee","#a78bfa","#34d399","#fbbf24","#fb7185","#f97316"];
+  for (let i = 0; i < 48; i++) {
+    const el = document.createElement("div");
+    el.style.cssText = `position:absolute;left:${Math.random()*100}%;top:-12px;width:${6+Math.random()*8}px;height:${4+Math.random()*5}px;background:${colors[i%6]};border-radius:2px;animation:confettiFall ${1.8+Math.random()*1.5}s ease-in ${Math.random()*0.8}s forwards;opacity:0.95`;
+    box.appendChild(el);
+  }
+  if (!document.getElementById("confettiStyle")) {
+    const st = document.createElement("style"); st.id = "confettiStyle";
+    st.textContent = `@keyframes confettiFall{0%{transform:translateY(0) rotate(0);opacity:1}100%{transform:translateY(420px) rotate(720deg);opacity:0}}`;
+    document.head.appendChild(st);
+  }
+}
+function drawWeaponIcon(kind, x, y) {
+  ctx.save(); ctx.translate(x, y);
+  if (kind === "shield") {
+    ctx.shadowColor = "#60a5fa"; ctx.shadowBlur = 10; ctx.strokeStyle = "#60a5fa"; ctx.fillStyle = "rgba(96,165,250,.35)"; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.moveTo(0,-12); ctx.lineTo(10,-6); ctx.lineTo(10,4); ctx.lineTo(0,12); ctx.lineTo(-10,4); ctx.lineTo(-10,-6); ctx.closePath(); ctx.fill(); ctx.stroke();
+  } else {
+    const spec = WEAPON[kind]; if (!spec) { ctx.restore(); return; }
+    ctx.shadowColor = spec.color; ctx.shadowBlur = 10; ctx.strokeStyle = spec.color; ctx.fillStyle = spec.color; ctx.lineWidth = 2.8; ctx.lineCap = "round";
+    if (kind === "spear") { ctx.beginPath(); ctx.moveTo(-14,8); ctx.lineTo(14,-8); ctx.stroke(); }
+    else if (kind === "pistol") { ctx.fillRect(-10,-3,16,6); ctx.fillRect(4,-6,8,4); ctx.fillRect(-8,3,4,8); }
+    else if (kind === "machinegun") { ctx.fillRect(-14,-4,22,7); ctx.fillRect(6,-7,10,5); ctx.fillRect(-10,3,5,9); }
+    else if (kind === "grenade") { ctx.beginPath(); ctx.arc(0,2,8,0,Math.PI*2); ctx.fill(); ctx.fillRect(-3,-10,6,6); }
+    else { ctx.beginPath(); ctx.arc(0,0,7,0,Math.PI*2); ctx.stroke(); }
+  }
+  ctx.restore();
+}
+function drawStick(f, color) {
+  const px = f.x + f.w / 2, headY = f.y + 12, spec = WEAPON[f.weapon] || WEAPON.fists;
+  ctx.save();
+  if (f.flash > 0) ctx.globalAlpha = 0.5;
+  if (f.shield > 0) {
+    ctx.globalAlpha = 0.15 + (f.shield / f.maxShield) * 0.25;
+    ctx.strokeStyle = "#60a5fa"; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.arc(px, f.y + f.h / 2, 28, 0, Math.PI * 2); ctx.stroke();
+    ctx.globalAlpha = f.flash > 0 ? 0.5 : 1;
+  }
+  ctx.shadowColor = color; ctx.shadowBlur = 12; ctx.strokeStyle = color; ctx.lineWidth = 3.8; ctx.lineCap = "round";
+  ctx.beginPath(); ctx.arc(px, headY, 10, 0, Math.PI * 2); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(px, headY + 10); ctx.lineTo(px, f.y + 42); ctx.stroke();
+  const swing = f.swing > 0 ? f.facing * (spec.type === "melee" ? 28 : 12) : 0;
+  ctx.beginPath(); ctx.moveTo(px, f.y + 22); ctx.lineTo(px - 17, f.y + 38);
+  ctx.moveTo(px, f.y + 22); ctx.lineTo(px + f.facing * 20 + swing, f.y + 28 - (f.swing > 0 && spec.type === "melee" ? 10 : 0)); ctx.stroke();
+  const hx = px + f.facing * 20 + swing, hy = f.y + 28 - (f.swing > 0 && spec.type === "melee" ? 10 : 0);
+  ctx.shadowColor = spec.color; ctx.strokeStyle = spec.color; ctx.fillStyle = spec.color;
+  if (f.weapon === "spear") { ctx.lineWidth = 2.6; ctx.beginPath(); ctx.moveTo(hx - f.facing * 6, hy + 2); ctx.lineTo(hx + f.facing * 42, hy - 4); ctx.stroke(); }
+  else if (f.weapon === "pistol") { ctx.fillRect(hx - 2, hy - 3, f.facing * 16, 6); ctx.fillRect(hx + f.facing * 10, hy - 6, f.facing * 6, 4); }
+  else if (f.weapon === "machinegun") { ctx.fillRect(hx - 2, hy - 4, f.facing * 22, 7); ctx.fillRect(hx + f.facing * 14, hy - 7, f.facing * 8, 4); }
+  else if (f.weapon === "grenade") { ctx.beginPath(); ctx.arc(hx + f.facing * 8, hy, 6, 0, Math.PI * 2); ctx.fill(); }
+  ctx.shadowColor = color; ctx.strokeStyle = color; ctx.lineWidth = 3.8;
+  const bob = Math.sin(f.x * 0.08) * (Math.abs(f.vx) > 20 ? 5 : 0);
+  ctx.beginPath(); ctx.moveTo(px, f.y + 42); ctx.lineTo(px - 11, f.y + f.h + bob);
+  ctx.moveTo(px, f.y + 42); ctx.lineTo(px + 11, f.y + f.h - bob); ctx.stroke();
+  ctx.restore();
+}
+function draw() {
+  const palettes = [["#06101c","#0c2840","#12304a"],["#120818","#2a1040","#3a1848"],["#06140e","#0c3820","#145032"],["#160e06","#3a2810","#4a3014"],["#160808","#3a1014","#4a1418"],["#060818","#101838","#1c2458"]];
+  const pal = palettes[((sim.mode === "survival" ? sim.wave : sim.level) - 1) % 6];
+  const sky = ctx.createLinearGradient(0, 0, 0, WORLD_H);
+  sky.addColorStop(0, pal[0]); sky.addColorStop(0.55, pal[1]); sky.addColorStop(1, pal[2]);
+  ctx.fillStyle = sky; ctx.fillRect(0, 0, WORLD_W, WORLD_H);
+  ctx.fillStyle = "rgba(255,255,255,.22)";
+  for (let i = 0; i < 48; i++) ctx.fillRect((i * 97 + sim.level * 40) % WORLD_W, (i * 53) % 300, i % 4 === 0 ? 2.2 : 1.2, i % 4 === 0 ? 2.2 : 1.2);
+  ctx.fillStyle = "#151c30"; ctx.fillRect(0, GROUND, WORLD_W, WORLD_H - GROUND);
+  ctx.fillStyle = "#22d3ee"; ctx.fillRect(0, GROUND, WORLD_W, 3);
+  for (const p of sim.plats) { ctx.fillStyle = "#1a2336"; ctx.fillRect(p.x, p.y, p.w, p.h + 4); ctx.fillStyle = "#67e8f9"; ctx.fillRect(p.x, p.y, p.w, 3); }
+  for (const d of sim.drops) drawWeaponIcon(d.kind, d.x + 11, d.y + 11);
+  for (const b of sim.bullets) { ctx.save(); ctx.shadowColor = b.color; ctx.shadowBlur = 8; ctx.fillStyle = b.color; ctx.beginPath(); ctx.arc(b.x, b.y, b.size, 0, Math.PI * 2); ctx.fill(); ctx.restore(); }
+  for (const g of sim.grenades) {
+    ctx.save(); ctx.translate(g.x + 7, g.y + 7); ctx.rotate(performance.now() / 120);
+    ctx.fillStyle = "#f97316"; ctx.shadowColor = "#f97316"; ctx.shadowBlur = 8;
+    ctx.beginPath(); ctx.arc(0, 0, 7, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#fbbf24"; ctx.fillRect(-2, -9, 4, 5);
+    if (g.fuse < 0.5) { ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(0, -11, 2 + Math.random() * 2, 0, Math.PI * 2); ctx.fill(); }
+    ctx.restore();
+  }
+  for (const ex of sim.explosions) {
+    const t = 1 - ex.life / 0.45;
+    ctx.save(); ctx.globalAlpha = 1 - t;
+    const grd = ctx.createRadialGradient(ex.x, ex.y, 0, ex.x, ex.y, ex.r);
+    grd.addColorStop(0, "#fff7ed"); grd.addColorStop(0.3, "#f97316"); grd.addColorStop(1, "rgba(249,115,22,0)");
+    ctx.fillStyle = grd; ctx.beginPath(); ctx.arc(ex.x, ex.y, ex.r, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+  }
+  for (const pt of sim.particles) { ctx.globalAlpha = Math.max(0, pt.life * 2); ctx.fillStyle = pt.color; ctx.fillRect(pt.x, pt.y, pt.size, pt.size); }
+  ctx.globalAlpha = 1;
+  drawStick(sim.enemy, "#fb7185"); drawStick(sim.player, "#22d3ee");
+  ctx.font = "700 17px ui-sans-serif, system-ui"; ctx.textAlign = "center";
+  for (const f of sim.floats) { ctx.globalAlpha = Math.max(0, f.life); ctx.fillStyle = f.color; ctx.fillText(f.t, f.x, f.y); }
+  ctx.globalAlpha = 1;
+}
+let last = 0, acc = 0, hudAcc = 0;
+function frame(now) {
+  if (!sim) return;
+  const dt = Math.min(0.05, (now - last) / 1000 || 0); last = now; acc += dt;
+  while (acc >= 1 / 60) { step(1 / 60); acc -= 1 / 60; }
+  const rect = canvas.getBoundingClientRect(), dpr = Math.min(2, devicePixelRatio || 1);
+  const bw = Math.max(1, Math.floor(rect.width * dpr)), bh = Math.max(1, Math.floor(rect.height * dpr));
+  if (canvas.width !== bw || canvas.height !== bh) { canvas.width = bw; canvas.height = bh; }
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  const scale = Math.min(rect.width / WORLD_W, rect.height / WORLD_H);
+  ctx.fillStyle = "#03040a"; ctx.fillRect(0, 0, rect.width, rect.height);
+  ctx.save();
+  const sx = sim.shake > 0 ? (Math.random() - 0.5) * 10 : 0, sy = sim.shake > 0 ? (Math.random() - 0.5) * 8 : 0;
+  ctx.translate((rect.width - WORLD_W * scale) / 2 + sx, (rect.height - WORLD_H * scale) / 2 + sy);
+  ctx.scale(scale, scale); draw(); ctx.restore();
+  hudAcc += dt; if (hudAcc > 0.08) { hudAcc = 0; paintHud(); }
+  raf = requestAnimationFrame(frame);
+}
+function paintHud() {
+  if (!sim) return;
+  document.getElementById("pLabel").textContent = currentUser || "Tú";
+  document.getElementById("pHp").textContent = Math.ceil(sim.player.hp);
+  document.getElementById("eHp").textContent = Math.ceil(sim.enemy.hp);
+  document.getElementById("pFill").style.width = (100 * sim.player.hp / sim.player.maxHp) + "%";
+  document.getElementById("eFill").style.width = (100 * sim.enemy.hp / sim.enemy.maxHp) + "%";
+  document.getElementById("pShield").style.width = (100 * sim.player.shield / MAX_SHIELD) + "%";
+  document.getElementById("eShield").style.width = (100 * sim.enemy.shield / MAX_SHIELD) + "%";
+  document.getElementById("title").textContent = sim.mode === "survival" ? "Oleada " + sim.wave : LEVELS[sim.level - 1].name;
+  document.getElementById("wlabel").textContent = (WEAPON[sim.player.weapon] || WEAPON.fists).label;
+  document.getElementById("shieldLabel").textContent = sim.player.shield > 0 ? "Escudo " + Math.ceil(sim.player.shield) : "";
+  const over = document.getElementById("over");
+  over.classList.toggle("show", !!sim.over);
+  over.classList.toggle("win-anim", !!sim.over && sim.over === "win" && sim.winAnim);
+  if (sim.over) {
+    document.getElementById("overTitle").textContent = sim.over === "win" ? "¡Victoria!" : "Derrota";
+    document.getElementById("overTitle").style.color = sim.over === "win" ? "#6ee7b7" : "#fb7185";
+    document.getElementById("overMsg").textContent = sim.over === "win"
+      ? (currentUser ? "Progreso guardado en tu cuenta." : "El siguiente nivel queda abierto.")
+      : (sim.mode === "survival" ? "Oleada " + sim.wave + " · bajas " + sim.kills : "Recoge escudos y usa granadas.");
+    document.getElementById("nextBtn").style.display = sim.over === "win" && sim.mode === "level" && sim.level < 6 ? "" : "none";
+    document.getElementById("tip").classList.remove("show");
+  }
+}
+function start(m, lv) {
+  mode = m; level = lv; sim = boot(m, lv); keys.clear(); last = performance.now(); acc = 0;
+  document.getElementById("over").classList.remove("show", "win-anim");
+  document.getElementById("confetti").innerHTML = "";
+  document.getElementById("tip").classList.remove("show");
+  show("play"); updateHelpText(); cancelAnimationFrame(raf); raf = requestAnimationFrame(frame);
+}
+async function toMenu(won) {
+  if (won && sim && sim.mode === "level" && sim.level >= save.unlocked && save.unlocked < 6) save.unlocked = sim.level + 1;
+  if (sim && sim.mode === "survival") {
+    if (sim.wave > save.bestWave) save.bestWave = sim.wave;
+    if (sim.kills > save.bestKills) save.bestKills = sim.kills;
+    // Ranking API
+    if (useApiAuth && apiToken && apiOnline && (sim.wave > 0 || sim.kills > 0)) {
+      try {
+        await apiReq("POST", "/api/scores", { wave: sim.wave, kills: sim.kills, durationSec: 0 });
+      } catch (e) { console.warn("score fail", e.message); }
+    }
+  }
+  await persist();
+  cancelAnimationFrame(raf); sim = null; paintMenu();
+  refreshLeaderboard();
+  show("menu");
+}
+document.getElementById("survival").onclick = () => start("survival", 1);
+document.getElementById("toTutorial").onclick = () => show("tutorial");
+document.getElementById("backMenu").onclick = () => show("menu");
+document.getElementById("toControls").onclick = () => { listening = null; paintControls(); show("controls"); };
+document.getElementById("backFromControls").onclick = () => { listening = null; persist(); paintMenu(); show("menu"); };
+document.getElementById("resetKeys").onclick = () => { save.keys = JSON.parse(JSON.stringify(DEFAULT_KEYS)); listening = null; paintControls(); persist(); };
+document.getElementById("nextBtn").onclick = () => start("level", level + 1);
+document.getElementById("retryBtn").onclick = () => start(mode, level);
+document.getElementById("menuBtn").onclick = () => toMenu(sim && sim.over === "win");
+canvas.addEventListener("contextmenu", e => e.preventDefault());
+canvas.addEventListener("mousedown", e => { if (e.button === 2 && sim) { e.preventDefault(); sim.wantAttack = true; sim.holdAttack = true; } });
+canvas.addEventListener("mouseup", e => { if (e.button === 2 && sim) sim.holdAttack = false; });
+canvas.addEventListener("mouseleave", () => { if (sim) sim.holdAttack = false; });
+addEventListener("keydown", e => {
+  if (listening) {
+    e.preventDefault();
+    if (/^(Shift|Control|Alt|Meta)/.test(e.code)) return;
+    for (const a of Object.keys(save.keys)) save.keys[a] = save.keys[a].filter(c => c !== e.code);
+    save.keys[listening] = [e.code]; listening = null; paintControls(); persist(); return;
+  }
+  if (e.code === "Space") e.preventDefault();
+  keys.add(e.code);
+  if (sim && save.keys.attack.includes(e.code)) sim.wantAttack = true;
+});
+addEventListener("keyup", e => keys.delete(e.code));
+addEventListener("blur", () => keys.clear());
+function hold(id, action) {
+  const el = document.getElementById(id);
+  const on = ev => { ev.preventDefault(); const c = save.keys[action][0]; if (c) keys.add(c); };
+  const off = () => { const c = save.keys[action][0]; if (c) keys.delete(c); };
+  el.addEventListener("pointerdown", on); el.addEventListener("pointerup", off);
+  el.addEventListener("pointerleave", off); el.addEventListener("pointercancel", off);
+}
+hold("tL", "left"); hold("tR", "right"); hold("tJ", "jump");
+document.getElementById("tA").addEventListener("pointerdown", e => { e.preventDefault(); if (sim) { sim.wantAttack = true; sim.holdAttack = true; } });
+["pointerup","pointerleave","pointercancel"].forEach(ev => document.getElementById("tA").addEventListener(ev, () => { if (sim) sim.holdAttack = false; }));
+
+(async function init() {
+  await checkApi();
+  // Restaurar sesión API
+  if (apiToken && apiOnline) {
+    try {
+      const data = await apiReq("GET", "/api/me");
+      useApiAuth = true;
+      currentUser = data.user.username;
+      setSession(currentUser);
+      save = { ...defaultProgress(), ...data.progress };
+      if (data.loadout) loadout = data.loadout;
+      normalizeKeys();
+      persistLocalOnly();
+      paintMenu();
+      await refreshLeaderboard();
+      show("menu");
+      return;
+    } catch {
+      setApiToken(null);
+      useApiAuth = false;
+    }
+  }
+  const sess = getSession();
+  if (sess && sess.user) {
+    const db = loadDB();
+    if (db[sess.user]) {
+      useApiAuth = false;
+      currentUser = sess.user;
+      loadProgress();
+      paintMenu();
+      show("menu");
+      return;
+    }
+  }
+  setSession(null); show("auth"); updateAccountBadge();
+})();
+</script>
+</body>
+</html>
